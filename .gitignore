@@ -1,0 +1,72 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+.env.bak/
+env.bak/
+.venv.bak/
+
+# Flask instance folder (for config and uploads)
+instance/
+*.db
+*.sqlite3
+
+# Flask-SocketIO and logs
+*.log
+*.pid
+*.sock
+
+# Pytest, coverage, and test artifacts
+.coverage
+.tox/
+.nox/
+.pytest_cache/
+nosetests.xml
+coverage.xml
+htmlcov/
+.cache/
+*.cover
+.hypothesis/
+
+# MyPy, Pyre, Pylint
+.mypy_cache/
+.pyre/
+pylint-report.txt
+pylint.log
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+*.egg
+
+# IDE settings
+.vscode/
+.idea/
+*.code-workspace
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Local environment files
+*.env
+.env.*
+*.local
+
+# Temporary files
+*.swp
+*.bak
+*.tmp
+*.orig
+
+# Jupyter (if any notebooks are present)
+.ipynb_checkpoints

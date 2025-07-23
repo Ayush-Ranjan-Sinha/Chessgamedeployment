@@ -152,6 +152,7 @@
         .piece {
             user-select: none;
             pointer-events: none;
+            font-size: inherit;
         }
         
         .game-controls {
@@ -269,6 +270,11 @@
                 flex-direction: column;
                 gap: 10px;
             }
+            
+            .square.valid-move::after {
+                width: 15px;
+                height: 15px;
+            }
         }
     </style>
 </head>
@@ -370,7 +376,6 @@
             
             const piece = boardState[row][col];
             
-            // If no square is selected
             if (!selectedSquare) {
                 if (piece && piece.color === playerColor) {
                     selectSquare(row, col);
@@ -378,26 +383,27 @@
                 return;
             }
             
-            // If clicking on the same square, deselect
             if (selectedSquare.row === row && selectedSquare.col === col) {
                 deselectSquare();
                 return;
             }
             
-            // If clicking on a valid move
             if (isValidMove(row, col)) {
-                makeMove(selectedSquare.row, selectedSquare.col, row, col);
+                let promotion = null;
+                const selectedPiece = boardState[selectedSquare.row][selectedSquare.col];
+                if (selectedPiece.piece_type === 'pawn' && (row === 0 || row === 7)) {
+                    promotion = prompt('Promote pawn to (queen, rook, bishop, knight):') || 'queen';
+                }
+                makeMove(selectedSquare.row, selectedSquare.col, row, col, promotion);
                 deselectSquare();
                 return;
             }
             
-            // If clicking on another piece of the same color
             if (piece && piece.color === playerColor) {
                 selectSquare(row, col);
                 return;
             }
             
-            // Otherwise, deselect
             deselectSquare();
         }
         
@@ -413,11 +419,13 @@
             updateSquareHighlights();
         }
         
-        function makeMove(fromRow, fromCol, toRow, toCol) {
-            socket.emit('make_move', {
+        function makeMove(fromRow, fromCol, toRow, toCol, promotion = null) {
+            const moveData = {
                 from: [fromRow, fromCol],
                 to: [toRow, toCol]
-            });
+            };
+            if (promotion) moveData.promotion = promotion;
+            socket.emit('make_move', moveData);
         }
         
         function isValidMove(row, col) {
@@ -465,15 +473,17 @@
             }
         }
         
-        function showMessage(message, type = 'info') {
+        function showMessage(message, type = 'info', persistent = false) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = message;
             messageDiv.className = `message ${type}`;
             messageDiv.style.display = 'block';
             
-            setTimeout(() => {
-                messageDiv.style.display = 'none';
-            }, 3000);
+            if (!persistent) {
+                setTimeout(() => {
+                    messageDiv.style.display = 'none';
+                }, 5000);
+            }
         }
         
         function playerReady() {
@@ -487,6 +497,8 @@
         }
         
         function goHome() {
+            localStorage.removeItem('chess_player_id');  // Clear storage on exit
+            localStorage.removeItem('chess_game_code');
             window.location.href = '/';
         }
         
@@ -498,6 +510,7 @@
         
         socket.on('game_joined', function(data) {
             playerColor = data.player_color;
+            localStorage.setItem('chess_player_id', data.player_id);  // Update storage
             updatePlayerStatus(playerColor, 'You');
             showMessage(`You are playing as ${playerColor}`, 'success');
         });
@@ -506,14 +519,14 @@
             if (data.players_count === 2) {
                 updatePlayerStatus('white', playerColor === 'white' ? 'You' : 'Opponent');
                 updatePlayerStatus('black', playerColor === 'black' ? 'You' : 'Opponent');
-                updateGameStatus('Both players joined! Click Ready when you want to start.', 'waiting');
+                updateGameStatus('Both players joined! Click Ready to start.', 'waiting');
             }
         });
         
         socket.on('both_players_connected', function(data) {
             updatePlayerStatus('white', playerColor === 'white' ? 'You' : 'Opponent');
             updatePlayerStatus('black', playerColor === 'black' ? 'You' : 'Opponent');
-            updateGameStatus('Both players joined! Click Ready when you want to start.', 'waiting');
+            updateGameStatus('Both players joined! Click Ready to start.', 'waiting');
         });
         
         socket.on('game_started', function(data) {
@@ -534,10 +547,10 @@
                 if (data.winner) {
                     updateGameStatus(`${data.winner.charAt(0).toUpperCase() + data.winner.slice(1)} wins!`, 'game-over');
                     showMessage(`${data.winner === playerColor ? 'You' : 'Opponent'} won!`, 
-                               data.winner === playerColor ? 'success' : 'error');
+                                data.winner === playerColor ? 'success' : 'error', true);
                 } else {
                     updateGameStatus('Game ended in a draw!', 'game-over');
-                    showMessage('Game ended in a draw!', 'info');
+                    showMessage('Game ended in a draw!', 'info', true);
                 }
             }
             
@@ -569,13 +582,13 @@
             if (data.players_count === 1) {
                 updateGameStatus('Opponent disconnected', 'waiting');
                 gameStarted = false;
-                showMessage('Opponent disconnected', 'error');
+                showMessage('Opponent disconnected', 'error', true);
             }
         });
         
         socket.on('error', function(data) {
             if (data.message === 'Game not found') {
-                showMessage('Game not found. Redirecting to home...', 'error');
+                showMessage('Game not found. Redirecting to home...', 'error', true);
                 setTimeout(() => {
                     window.location.href = '/';
                 }, 2000);
@@ -586,14 +599,61 @@
         
         socket.on('disconnect', function() {
             console.log('Disconnected from server');
-            showMessage('Disconnected from server', 'error');
+            showMessage('Disconnected from server. Trying to reconnect...', 'error', true);
+        });
+        
+        socket.on('connect_error', function(err) {
+            showMessage('Connection error: ' + err.message, 'error', true);
+        });
+        
+        // New handler for state sync
+        socket.on('game_state', function(data) {
+            updateBoard(data.board_state);
+            playerColor = data.player_color;
+            gameStarted = data.game_started;
+            updateCurrentPlayer(data.current_player);
+            updatePlayerStatus('white', data.players.white);
+            updatePlayerStatus('black', data.players.black);
+            if (gameStarted) {
+                document.getElementById('readySection').style.display = 'none';
+                document.getElementById('resetBtn').disabled = false;
+                updateGameStatus(`${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}'s Turn`, 'playing');
+            } else {
+                document.getElementById('readySection').style.display = 'block';
+                updateGameStatus('Waiting for players to ready up...', 'waiting');
+            }
         });
         
         // Initialize
         createBoard();
+        document.getElementById('loading').style.display = 'block';
         
-        // Join the game automatically
-        socket.emit('join_game', { game_code: gameCode });
+        // Retrieve stored player_id and game_code
+        const storedPlayerId = localStorage.getItem('chess_player_id');
+        const storedGameCode = localStorage.getItem('chess_game_code');
+        
+        if (storedPlayerId && storedGameCode === gameCode) {
+            // Use stored player_id for get_game_state
+            socket.emit('get_game_state', { game_code: gameCode, player_id: storedPlayerId });
+        } else {
+            // Fallback: Join to get player_id, then get state
+            socket.emit('join_game', { game_code: gameCode });
+            setTimeout(() => {
+                const newPlayerId = localStorage.getItem('chess_player_id');
+                if (newPlayerId) {
+                    socket.emit('get_game_state', { game_code: gameCode, player_id: newPlayerId });
+                } else {
+                    showMessage('Failed to authorize. Please join from home page.', 'error', true);
+                }
+            }, 1000);  // Delay to allow join to complete
+        }
+        
+        // Timeout if no response
+        setTimeout(() => {
+            if (!playerColor) {
+                showMessage('No response from server. Please refresh.', 'error', true);
+            }
+        }, 10000);
     </script>
 </body>
 </html>

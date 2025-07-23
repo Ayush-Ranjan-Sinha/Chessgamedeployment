@@ -173,6 +173,16 @@
         .instructions li {
             margin: 5px 0;
         }
+        
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            margin-top: 10px;
+        }
+        
+        .copy-btn:hover {
+            background: #5a6fd1;
+        }
     </style>
 </head>
 <body>
@@ -185,7 +195,7 @@
             
             <div class="join-section">
                 <input type="text" id="gameCodeInput" class="join-input" placeholder="Enter Game Code" maxlength="6">
-                <button class="join-btn" id="joinBtn" onclick="joinGame()">Join Game</button>
+                <button class="join-btn" id="joinBtn" onclick="joinGame()" disabled>Join Game</button>
             </div>
         </div>
         
@@ -194,15 +204,16 @@
                 <h3>Game Created!</h3>
                 <div>Share this code with your opponent:</div>
                 <div class="game-code" id="gameCode"></div>
+                <button class="copy-btn" onclick="copyCode()">Copy Code</button>
                 <div>Waiting for opponent to join...</div>
             </div>
-            <div class="loading">
+            <div class="loading" id="loading">
                 <div class="spinner"></div>
                 <div>Waiting for opponent...</div>
             </div>
         </div>
         
-        <div id="message" class="error"></div>
+        <div id="message" class="error" style="display: none;"></div>
         
         <div class="instructions">
             <h3>How to Play:</h3>
@@ -210,7 +221,7 @@
                 <li><strong>Create Game:</strong> Click "Create New Game" to start a new game and get a code</li>
                 <li><strong>Join Game:</strong> Enter the 6-character code to join an existing game</li>
                 <li><strong>Share Code:</strong> Send the game code to your opponent</li>
-                <li><strong>Play:</strong> Once both players join, the game will start automatically</li>
+                <li><strong>Play:</strong> Once both players join and ready up, the game starts</li>
             </ul>
         </div>
     </div>
@@ -250,22 +261,33 @@
             socket.emit('join_game', { game_code: gameCode });
         }
         
+        function copyCode() {
+            const code = document.getElementById('gameCode').textContent;
+            navigator.clipboard.writeText(code).then(() => showMessage('Code copied to clipboard!', 'success'));
+        }
+        
         function showMessage(message, type) {
             const messageDiv = document.getElementById('message');
             messageDiv.textContent = message;
             messageDiv.className = type;
+            messageDiv.style.display = 'block';
+            setTimeout(() => { messageDiv.style.display = 'none'; }, 5000);
         }
         
         // Socket event handlers
         socket.on('game_created', function(data) {
+            localStorage.setItem('chess_player_id', data.player_id);
+            localStorage.setItem('chess_game_code', data.game_code);
             document.getElementById('main-menu').style.display = 'none';
             document.getElementById('game-created').style.display = 'block';
             document.getElementById('gameCode').textContent = data.game_code;
-            document.querySelector('.loading').style.display = 'block';
+            document.getElementById('loading').style.display = 'block';
             showMessage('Game created! Share the code with your opponent.', 'success');
         });
         
         socket.on('game_joined', function(data) {
+            localStorage.setItem('chess_player_id', data.player_id);
+            localStorage.setItem('chess_game_code', data.game_code);
             showMessage('Joined game successfully! Redirecting...', 'success');
             setTimeout(() => {
                 window.location.href = `/game/${data.game_code}`;
@@ -292,6 +314,11 @@
         
         socket.on('disconnect', function() {
             console.log('Disconnected from server');
+            showMessage('Disconnected from server. Please refresh.', 'error');
+        });
+        
+        socket.on('connect_error', function(err) {
+            showMessage('Connection error: ' + err.message, 'error');
         });
     </script>
 </body>
