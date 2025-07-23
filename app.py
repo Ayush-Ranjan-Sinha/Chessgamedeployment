@@ -5,6 +5,7 @@ import random
 import string
 from online_chess_board import OnlineChessBoard  # Your provided file
 import time
+import threading
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key-here'
@@ -432,6 +433,45 @@ def handle_disconnect():
                 print(f"DEBUG: Cleaned up inactive game {game_code}")
         
         socketio.start_background_task(cleanup_game)
+
+
+# Add a background task to check timers every second and end the game if a timer reaches zero.
+def timer_check_task():
+    while True:
+        time.sleep(1)
+        for game_code, game in list(games.items()):
+            if not game.get('game_started') or game.get('game_over'):
+                continue
+            now = time.time()
+            if game['last_move_time']:
+                turn = game['current_player']
+                elapsed = int(now - game['last_move_time'])
+                remaining = game['remaining_time'][turn] - elapsed
+                if remaining <= 0:
+                    game['remaining_time'][turn] = 0
+                    game['game_over'] = True
+                    game['winner'] = 'black' if turn == 'white' else 'white'
+                    board_state = game['board'].get_board_state()
+                    socketio.emit('move_made', {
+                        'board_state': board_state['board'],
+                        'white_king': board_state['white_king'],
+                        'black_king': board_state['black_king'],
+                        'white_in_check': board_state['white_in_check'],
+                        'black_in_check': board_state['black_in_check'],
+                        'current_player': game['current_player'],
+                        'game_over': game['game_over'],
+                        'winner': game['winner'],
+                        'timer': game['timer'],
+                        'remaining_time': game['remaining_time'],
+                        'captured': board_state['captured'],
+                        'material_diff': board_state['material_diff']
+                    }, room=game_code)
+                    game['last_move_time'] = None
+                else:
+                    game['remaining_time'][turn] = remaining
+
+# Start the timer check task in the background
+threading.Thread(target=timer_check_task, daemon=True).start()
 
 
 if __name__ == '__main__':
