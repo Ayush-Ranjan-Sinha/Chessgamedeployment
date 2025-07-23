@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chess Game - {{ game_code }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .game-container {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 800px;
+            width: 95%;
+        }
+        
+        .game-header {
+            margin-bottom: 20px;
+        }
+        
+        .game-code {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #667eea;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .game-status {
+            font-size: 1.2em;
+            margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        
+        .status-waiting {
+            background: #fff3cd;
+            color: #856404;
+            border: 1px solid #ffeaa7;
+        }
+        
+        .status-playing {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-game-over {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .player-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        
+        .player {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            flex: 1;
+            margin: 0 10px;
+        }
+        
+        .player.white {
+            background: #f8f9fa;
+            border: 2px solid #dee2e6;
+        }
+        
+        .player.black {
+            background: #343a40;
+            color: white;
+            border: 2px solid #495057;
+        }
+        
+        .player.active {
+            border-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+        }
+        
+        .chess-board {
+            display: grid;
+            grid-template-columns: repeat(8, 60px);
+            grid-template-rows: repeat(8, 60px);
+            gap: 0;
+            margin: 20px auto;
+            border: 3px solid #333;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .square {
+            width: 60px;
+            height: 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .square.light {
+            background: #f0d9b5;
+        }
+        
+        .square.dark {
+            background: #b58863;
+        }
+        
+        .square.selected {
+            background: #87ceeb !important;
+            box-shadow: inset 0 0 0 3px #4169e1;
+        }
+        
+        .square.valid-move {
+            background: #90ee90 !important;
+            box-shadow: inset 0 0 0 3px #32cd32;
+        }
+        
+        .square.valid-move::after {
+            content: '';
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #32cd32;
+            border-radius: 50%;
+            opacity: 0.7;
+        }
+        
+        .square:hover {
+            transform: scale(1.05);
+        }
+        
+        .piece {
+            user-select: none;
+            pointer-events: none;
+        }
+        
+        .game-controls {
+            margin-top: 20px;
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            margin: 5px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+        
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .ready-section {
+            margin: 20px 0;
+        }
+        
+        .ready-btn {
+            background: #28a745;
+            color: white;
+            padding: 15px 30px;
+            font-size: 1.1em;
+        }
+        
+        .ready-btn:hover {
+            background: #218838;
+        }
+        
+        .ready-btn:disabled {
+            background: #ccc;
+        }
+        
+        .message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        
+        .loading {
+            display: none;
+            margin: 20px 0;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 600px) {
+            .chess-board {
+                grid-template-columns: repeat(8, 45px);
+                grid-template-rows: repeat(8, 45px);
+            }
+            
+            .square {
+                width: 45px;
+                height: 45px;
+                font-size: 1.5em;
+            }
+            
+            .player-info {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="game-code">Game Code: {{ game_code }}</div>
+            <div id="gameStatus" class="game-status status-waiting">Waiting for players...</div>
+        </div>
+        
+        <div class="player-info">
+            <div id="whitePlayer" class="player white">
+                <div>White Player</div>
+                <div id="whiteStatus">Waiting...</div>
+            </div>
+            <div id="blackPlayer" class="player black">
+                <div>Black Player</div>
+                <div id="blackStatus">Waiting...</div>
+            </div>
+        </div>
+        
+        <div class="ready-section" id="readySection">
+            <button id="readyBtn" class="btn ready-btn" onclick="playerReady()">Ready to Play</button>
+        </div>
+        
+        <div class="chess-board" id="chessBoard"></div>
+        
+        <div class="game-controls">
+            <button id="resetBtn" class="btn btn-secondary" onclick="resetGame()" disabled>Reset Game</button>
+            <button class="btn btn-primary" onclick="goHome()">Back to Home</button>
+        </div>
+        
+        <div id="message" class="message" style="display: none;"></div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <div>Connecting to game...</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.0/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const gameCode = '{{ game_code }}';
+        let playerColor = null;
+        let currentPlayer = 'white';
+        let gameStarted = false;
+        let selectedSquare = null;
+        let validMoves = [];
+        let boardState = null;
+        
+        const pieceSymbols = {
+            'king': { 'white': '♔', 'black': '♚' },
+            'queen': { 'white': '♕', 'black': '♛' },
+            'rook': { 'white': '♖', 'black': '♜' },
+            'bishop': { 'white': '♗', 'black': '♝' },
+            'knight': { 'white': '♘', 'black': '♞' },
+            'pawn': { 'white': '♙', 'black': '♟' }
+        };
+        
+        function createBoard() {
+            const board = document.getElementById('chessBoard');
+            board.innerHTML = '';
+            
+            for (let row = 0; row < 8; row++) {
+                for (let col = 0; col < 8; col++) {
+                    const square = document.createElement('div');
+                    square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
+                    square.dataset.row = row;
+                    square.dataset.col = col;
+                    square.onclick = () => handleSquareClick(row, col);
+                    board.appendChild(square);
+                }
+            }
+        }
+        
+        function updateBoard(newBoardState) {
+            boardState = newBoardState;
+            const squares = document.querySelectorAll('.square');
+            
+            squares.forEach(square => {
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                const piece = boardState[row][col];
+                
+                if (piece && piece.piece_type) {
+                    const symbol = pieceSymbols[piece.piece_type][piece.color];
+                    square.innerHTML = `<span class="piece">${symbol}</span>`;
+                } else {
+                    square.innerHTML = '';
+                }
+            });
+        }
+        
+        function handleSquareClick(row, col) {
+            if (!gameStarted || currentPlayer !== playerColor) {
+                return;
+            }
+            
+            const piece = boardState[row][col];
+            
+            // If no square is selected
+            if (!selectedSquare) {
+                if (piece && piece.color === playerColor) {
+                    selectSquare(row, col);
+                }
+                return;
+            }
+            
+            // If clicking on the same square, deselect
+            if (selectedSquare.row === row && selectedSquare.col === col) {
+                deselectSquare();
+                return;
+            }
+            
+            // If clicking on a valid move
+            if (isValidMove(row, col)) {
+                makeMove(selectedSquare.row, selectedSquare.col, row, col);
+                deselectSquare();
+                return;
+            }
+            
+            // If clicking on another piece of the same color
+            if (piece && piece.color === playerColor) {
+                selectSquare(row, col);
+                return;
+            }
+            
+            // Otherwise, deselect
+            deselectSquare();
+        }
+        
+        function selectSquare(row, col) {
+            selectedSquare = { row, col };
+            socket.emit('get_valid_moves', { position: [row, col] });
+            updateSquareHighlights();
+        }
+        
+        function deselectSquare() {
+            selectedSquare = null;
+            validMoves = [];
+            updateSquareHighlights();
+        }
+        
+        function makeMove(fromRow, fromCol, toRow, toCol) {
+            socket.emit('make_move', {
+                from: [fromRow, fromCol],
+                to: [toRow, toCol]
+            });
+        }
+        
+        function isValidMove(row, col) {
+            return validMoves.some(move => move[0] === row && move[1] === col);
+        }
+        
+        function updateSquareHighlights() {
+            const squares = document.querySelectorAll('.square');
+            
+            squares.forEach(square => {
+                const row = parseInt(square.dataset.row);
+                const col = parseInt(square.dataset.col);
+                
+                square.classList.remove('selected', 'valid-move');
+                
+                if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
+                    square.classList.add('selected');
+                }
+                
+                if (isValidMove(row, col)) {
+                    square.classList.add('valid-move');
+                }
+            });
+        }
+        
+        function updateGameStatus(status, type = 'info') {
+            const statusDiv = document.getElementById('gameStatus');
+            statusDiv.textContent = status;
+            statusDiv.className = `game-status status-${type}`;
+        }
+        
+        function updatePlayerStatus(color, status) {
+            const statusDiv = document.getElementById(`${color}Status`);
+            statusDiv.textContent = status;
+        }
+        
+        function updateCurrentPlayer(player) {
+            currentPlayer = player;
+            
+            document.getElementById('whitePlayer').classList.toggle('active', player === 'white');
+            document.getElementById('blackPlayer').classList.toggle('active', player === 'black');
+            
+            if (gameStarted) {
+                updateGameStatus(`${player.charAt(0).toUpperCase() + player.slice(1)}'s Turn`, 'playing');
+            }
+        }
+        
+        function showMessage(message, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.textContent = message;
+            messageDiv.className = `message ${type}`;
+            messageDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                messageDiv.style.display = 'none';
+            }, 3000);
+        }
+        
+        function playerReady() {
+            socket.emit('player_ready', {});
+            document.getElementById('readyBtn').disabled = true;
+            document.getElementById('readyBtn').textContent = 'Waiting for opponent...';
+        }
+        
+        function resetGame() {
+            socket.emit('reset_game');
+        }
+        
+        function goHome() {
+            window.location.href = '/';
+        }
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            document.getElementById('loading').style.display = 'none';
+        });
+        
+        socket.on('game_joined', function(data) {
+            playerColor = data.player_color;
+            updatePlayerStatus(playerColor, 'You');
+            showMessage(`You are playing as ${playerColor}`, 'success');
+        });
+        
+        socket.on('player_joined', function(data) {
+            if (data.players_count === 2) {
+                updatePlayerStatus('white', playerColor === 'white' ? 'You' : 'Opponent');
+                updatePlayerStatus('black', playerColor === 'black' ? 'You' : 'Opponent');
+                updateGameStatus('Both players joined! Click Ready when you want to start.', 'waiting');
+            }
+        });
+        
+        socket.on('both_players_connected', function(data) {
+            updatePlayerStatus('white', playerColor === 'white' ? 'You' : 'Opponent');
+            updatePlayerStatus('black', playerColor === 'black' ? 'You' : 'Opponent');
+            updateGameStatus('Both players joined! Click Ready when you want to start.', 'waiting');
+        });
+        
+        socket.on('game_started', function(data) {
+            gameStarted = true;
+            updateBoard(data.board_state);
+            updateCurrentPlayer(data.current_player);
+            updateGameStatus('Game started!', 'playing');
+            document.getElementById('readySection').style.display = 'none';
+            document.getElementById('resetBtn').disabled = false;
+        });
+        
+        socket.on('move_made', function(data) {
+            updateBoard(data.board_state);
+            updateCurrentPlayer(data.current_player);
+            
+            if (data.game_over) {
+                gameStarted = false;
+                if (data.winner) {
+                    updateGameStatus(`${data.winner.charAt(0).toUpperCase() + data.winner.slice(1)} wins!`, 'game-over');
+                    showMessage(`${data.winner === playerColor ? 'You' : 'Opponent'} won!`, 
+                               data.winner === playerColor ? 'success' : 'error');
+                } else {
+                    updateGameStatus('Game ended in a draw!', 'game-over');
+                    showMessage('Game ended in a draw!', 'info');
+                }
+            }
+            
+            deselectSquare();
+        });
+        
+        socket.on('valid_moves', function(data) {
+            validMoves = data.moves;
+            updateSquareHighlights();
+        });
+        
+        socket.on('invalid_move', function(data) {
+            showMessage(data.message, 'error');
+        });
+        
+        socket.on('game_reset', function(data) {
+            gameStarted = false;
+            updateBoard(data.board_state);
+            updateCurrentPlayer(data.current_player);
+            updateGameStatus('Game reset! Click Ready to start again.', 'waiting');
+            document.getElementById('readySection').style.display = 'block';
+            document.getElementById('readyBtn').disabled = false;
+            document.getElementById('readyBtn').textContent = 'Ready to Play';
+            document.getElementById('resetBtn').disabled = true;
+            deselectSquare();
+        });
+        
+        socket.on('player_disconnected', function(data) {
+            if (data.players_count === 1) {
+                updateGameStatus('Opponent disconnected', 'waiting');
+                gameStarted = false;
+                showMessage('Opponent disconnected', 'error');
+            }
+        });
+        
+        socket.on('error', function(data) {
+            if (data.message === 'Game not found') {
+                showMessage('Game not found. Redirecting to home...', 'error');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 2000);
+            } else {
+                showMessage(data.message, 'error');
+            }
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            showMessage('Disconnected from server', 'error');
+        });
+        
+        // Initialize
+        createBoard();
+        
+        // Join the game automatically
+        socket.emit('join_game', { game_code: gameCode });
+    </script>
+</body>
+</html>
