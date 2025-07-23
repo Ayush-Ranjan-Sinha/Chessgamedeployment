@@ -276,6 +276,10 @@
                 height: 15px;
             }
         }
+        .square.king-in-check {
+            box-shadow: 0 0 0 4px red, 0 0 10px 4px #ff000080;
+            z-index: 2;
+        }
     </style>
 </head>
 <body>
@@ -325,6 +329,10 @@
         let selectedSquare = null;
         let validMoves = [];
         let boardState = null;
+        let whiteKing = null;
+        let blackKing = null;
+        let whiteInCheck = false;
+        let blackInCheck = false;
         
         const pieceSymbols = {
             'king': { 'white': '♔', 'black': '♚' },
@@ -338,9 +346,11 @@
         function createBoard() {
             const board = document.getElementById('chessBoard');
             board.innerHTML = '';
-            
-            for (let row = 0; row < 8; row++) {
-                for (let col = 0; col < 8; col++) {
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    // Flip for black
+                    let row = playerColor === 'black' ? 7 - i : i;
+                    let col = playerColor === 'black' ? 7 - j : j;
                     const square = document.createElement('div');
                     square.className = `square ${(row + col) % 2 === 0 ? 'light' : 'dark'}`;
                     square.dataset.row = row;
@@ -350,65 +360,85 @@
                 }
             }
         }
-        
+
         function updateBoard(newBoardState) {
             boardState = newBoardState;
             const squares = document.querySelectorAll('.square');
-            
-            squares.forEach(square => {
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
-                const piece = boardState[row][col];
-                
-                if (piece && piece.piece_type) {
-                    const symbol = pieceSymbols[piece.piece_type][piece.color];
-                    square.innerHTML = `<span class="piece">${symbol}</span>`;
-                } else {
-                    square.innerHTML = '';
+            let idx = 0;
+            for (let i = 0; i < 8; i++) {
+                for (let j = 0; j < 8; j++) {
+                    let row = playerColor === 'black' ? 7 - i : i;
+                    let col = playerColor === 'black' ? 7 - j : j;
+                    const square = squares[idx++];
+                    const piece = boardState[row][col];
+                    square.classList.remove('king-in-check');
+                    if (piece && piece.piece_type) {
+                        const symbol = pieceSymbols[piece.piece_type][piece.color];
+                        square.innerHTML = `<span class="piece">${symbol}</span>`;
+                    } else {
+                        square.innerHTML = '';
+                    }
+                    // Highlight king in check
+                    if (whiteKing && whiteInCheck && row === whiteKing.row && col === whiteKing.col) {
+                        square.classList.add('king-in-check');
+                    }
+                    if (blackKing && blackInCheck && row === blackKing.row && col === blackKing.col) {
+                        square.classList.add('king-in-check');
+                    }
                 }
-            });
+            }
         }
         
-        function handleSquareClick(row, col) {
+        // Helper to map UI coordinates to backend coordinates
+        function toBackendCoords(row, col) {
+            if (playerColor === 'black') {
+                return [7 - row, 7 - col];
+            }
+            return [row, col];
+        }
+
+        function handleSquareClick(uiRow, uiCol) {
             if (!gameStarted || currentPlayer !== playerColor) {
                 return;
             }
-            
+            const [row, col] = toBackendCoords(uiRow, uiCol);
             const piece = boardState[row][col];
             
             if (!selectedSquare) {
                 if (piece && piece.color === playerColor) {
-                    selectSquare(row, col);
+                    selectSquare(uiRow, uiCol);
                 }
                 return;
             }
             
-            if (selectedSquare.row === row && selectedSquare.col === col) {
+            const [selRow, selCol] = toBackendCoords(selectedSquare.row, selectedSquare.col);
+            if (selRow === row && selCol === col) {
                 deselectSquare();
                 return;
             }
             
             if (isValidMove(row, col)) {
                 let promotion = null;
-                const selectedPiece = boardState[selectedSquare.row][selectedSquare.col];
+                const selectedPiece = boardState[selRow][selCol];
                 if (selectedPiece.piece_type === 'pawn' && (row === 0 || row === 7)) {
                     promotion = prompt('Promote pawn to (queen, rook, bishop, knight):') || 'queen';
                 }
-                makeMove(selectedSquare.row, selectedSquare.col, row, col, promotion);
+                makeMove(selRow, selCol, row, col, promotion);
                 deselectSquare();
                 return;
             }
             
             if (piece && piece.color === playerColor) {
-                selectSquare(row, col);
+                selectSquare(uiRow, uiCol);
                 return;
             }
             
             deselectSquare();
         }
         
-        function selectSquare(row, col) {
-            selectedSquare = { row, col };
+        function selectSquare(uiRow, uiCol) {
+            selectedSquare = { row: uiRow, col: uiCol };
+            const [row, col] = toBackendCoords(uiRow, uiCol);
             socket.emit('get_valid_moves', { position: [row, col] });
             updateSquareHighlights();
         }
@@ -429,6 +459,7 @@
         }
         
         function isValidMove(row, col) {
+            // validMoves are in backend coordinates
             return validMoves.some(move => move[0] === row && move[1] === col);
         }
         
@@ -436,15 +467,16 @@
             const squares = document.querySelectorAll('.square');
             
             squares.forEach(square => {
-                const row = parseInt(square.dataset.row);
-                const col = parseInt(square.dataset.col);
+                const uiRow = parseInt(square.dataset.row);
+                const uiCol = parseInt(square.dataset.col);
                 
                 square.classList.remove('selected', 'valid-move');
                 
-                if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
+                if (selectedSquare && selectedSquare.row === uiRow && selectedSquare.col === uiCol) {
                     square.classList.add('selected');
                 }
                 
+                const [row, col] = toBackendCoords(uiRow, uiCol);
                 if (isValidMove(row, col)) {
                     square.classList.add('valid-move');
                 }
@@ -531,6 +563,10 @@
         
         socket.on('game_started', function(data) {
             gameStarted = true;
+            whiteKing = data.white_king;
+            blackKing = data.black_king;
+            whiteInCheck = data.white_in_check;
+            blackInCheck = data.black_in_check;
             updateBoard(data.board_state);
             updateCurrentPlayer(data.current_player);
             updateGameStatus('Game started!', 'playing');
@@ -539,6 +575,10 @@
         });
         
         socket.on('move_made', function(data) {
+            whiteKing = data.white_king;
+            blackKing = data.black_king;
+            whiteInCheck = data.white_in_check;
+            blackInCheck = data.black_in_check;
             updateBoard(data.board_state);
             updateCurrentPlayer(data.current_player);
             
@@ -568,6 +608,10 @@
         
         socket.on('game_reset', function(data) {
             gameStarted = false;
+            whiteKing = data.white_king;
+            blackKing = data.black_king;
+            whiteInCheck = data.white_in_check;
+            blackInCheck = data.black_in_check;
             updateBoard(data.board_state);
             updateCurrentPlayer(data.current_player);
             updateGameStatus('Game reset! Click Ready to start again.', 'waiting');
@@ -608,6 +652,10 @@
         
         // New handler for state sync
         socket.on('game_state', function(data) {
+            whiteKing = data.white_king;
+            blackKing = data.black_king;
+            whiteInCheck = data.white_in_check;
+            blackInCheck = data.black_in_check;
             updateBoard(data.board_state);
             playerColor = data.player_color;
             gameStarted = data.game_started;

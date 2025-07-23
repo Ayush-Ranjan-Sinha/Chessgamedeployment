@@ -178,8 +178,13 @@ def handle_get_game_state(data):
         'black': 'You' if color == 'black' else 'Opponent' if 'black' in [p['color'] for p in game['players'].values()] else 'Waiting...'
     }
     
+    board_state = game['board'].get_board_state()
     emit('game_state', {
-        'board_state': game['board'].get_board_state(),
+        'board_state': board_state['board'],
+        'white_king': board_state['white_king'],
+        'black_king': board_state['black_king'],
+        'white_in_check': board_state['white_in_check'],
+        'black_in_check': board_state['black_in_check'],
         'player_color': color,
         'game_started': game['game_started'],
         'current_player': game['current_player'],
@@ -216,7 +221,11 @@ def handle_player_ready(data):
         game['game_started'] = True
         board_state = game['board'].get_board_state()
         socketio.emit('game_started', {
-            'board_state': board_state,
+            'board_state': board_state['board'],
+            'white_king': board_state['white_king'],
+            'black_king': board_state['black_king'],
+            'white_in_check': board_state['white_in_check'],
+            'black_in_check': board_state['black_in_check'],
             'current_player': game['current_player']
         }, room=game_code)
         print(f"DEBUG: Game {game_code} started - both players ready")
@@ -267,7 +276,11 @@ def handle_make_move(data):
         
         board_state = game['board'].get_board_state()
         socketio.emit('move_made', {
-            'board_state': board_state,
+            'board_state': board_state['board'],
+            'white_king': board_state['white_king'],
+            'black_king': board_state['black_king'],
+            'white_in_check': board_state['white_in_check'],
+            'black_in_check': board_state['black_in_check'],
             'current_player': game['current_player'],
             'game_over': game['game_over'],
             'winner': game['winner']
@@ -326,7 +339,11 @@ def handle_reset_game():
     
     board_state = game['board'].get_board_state()
     socketio.emit('game_reset', {
-        'board_state': board_state,
+        'board_state': board_state['board'],
+        'white_king': board_state['white_king'],
+        'black_king': board_state['black_king'],
+        'white_in_check': board_state['white_in_check'],
+        'black_in_check': board_state['black_in_check'],
         'current_player': game['current_player']
     }, room=game_code)
 

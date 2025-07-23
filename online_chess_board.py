@@ -175,12 +175,20 @@ class OnlineChessBoard:
         return len(self.get_all_valid_moves(color)) == 0
     
     def get_board_state(self):
-        """Return the current state of the board for broadcasting"""
+        """Return the current state of the board for broadcasting, including check status and king positions"""
         board_state = []
         for row in self.board:
             board_state.append([{'piece_type': piece.__class__.__name__.lower() if piece else None,
                                  'color': piece.color if piece else None} for piece in row])
-        return board_state
+        # Add check status and king positions
+        state = {
+            'board': board_state,
+            'white_king': {'row': self.white_king.row, 'col': self.white_king.col} if self.white_king else None,
+            'black_king': {'row': self.black_king.row, 'col': self.black_king.col} if self.black_king else None,
+            'white_in_check': self.is_in_check('white'),
+            'black_in_check': self.is_in_check('black')
+        }
+        return state
     
     def copy(self):
         """Create a copy of the board"""
