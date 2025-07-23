@@ -5,6 +5,7 @@ class OnlineChessBoard:
         self.board = [[None for _ in range(8)] for _ in range(8)]
         self.white_king = None
         self.black_king = None
+        self.captured = {'white': [], 'black': []}  # Track captured pieces
         self.setup_board()
     
     def setup_board(self):
@@ -93,6 +94,9 @@ class OnlineChessBoard:
         
         # Make the move
         captured_piece = self.get_piece(to_row, to_col)
+        if captured_piece:
+            # Record captured piece for the opponent
+            self.captured[captured_piece.color].append(captured_piece.piece_type)
         self.set_piece(to_row, to_col, piece)
         self.remove_piece(from_row, from_col)
         piece.move_to(to_row, to_col)
@@ -175,18 +179,32 @@ class OnlineChessBoard:
         return len(self.get_all_valid_moves(color)) == 0
     
     def get_board_state(self):
-        """Return the current state of the board for broadcasting, including check status and king positions"""
+        """Return the current state of the board for broadcasting, including check status, king positions, captured pieces, and material diff"""
         board_state = []
         for row in self.board:
             board_state.append([{'piece_type': piece.__class__.__name__.lower() if piece else None,
                                  'color': piece.color if piece else None} for piece in row])
-        # Add check status and king positions
+        # Calculate material difference
+        piece_values = {'pawn': 1, 'knight': 3, 'bishop': 3, 'rook': 5, 'queen': 9}
+        def total_value(captured):
+            return sum(piece_values.get(pt, 0) for pt in captured)
+        white_captured = self.captured['black']  # white captured black's pieces
+        black_captured = self.captured['white']  # black captured white's pieces
+        white_material = total_value(white_captured)
+        black_material = total_value(black_captured)
+        material_diff = white_material - black_material
+        # Add check status, king positions, captured pieces, and material diff
         state = {
             'board': board_state,
             'white_king': {'row': self.white_king.row, 'col': self.white_king.col} if self.white_king else None,
             'black_king': {'row': self.black_king.row, 'col': self.black_king.col} if self.black_king else None,
             'white_in_check': self.is_in_check('white'),
-            'black_in_check': self.is_in_check('black')
+            'black_in_check': self.is_in_check('black'),
+            'captured': {
+                'white': white_captured,
+                'black': black_captured
+            },
+            'material_diff': material_diff
         }
         return state
     

@@ -291,11 +291,11 @@
         
         <div class="player-info">
             <div id="whitePlayer" class="player white">
-                <div>White Player</div>
+                <div>White Player <span id="whiteTimer" style="font-size:0.9em; margin-left:10px; color:#888;"></span></div>
                 <div id="whiteStatus">Waiting...</div>
             </div>
             <div id="blackPlayer" class="player black">
-                <div>Black Player</div>
+                <div>Black Player <span id="blackTimer" style="font-size:0.9em; margin-left:10px; color:#ccc;"></span></div>
                 <div id="blackStatus">Waiting...</div>
             </div>
         </div>
@@ -304,7 +304,15 @@
             <button id="readyBtn" class="btn ready-btn" onclick="playerReady()">Ready to Play</button>
         </div>
         
-        <div class="chess-board" id="chessBoard"></div>
+        <div style="display: flex; justify-content: center; align-items: flex-start; gap: 20px;">
+            <div id="leftCaptured" style="min-width: 60px;"></div>
+            <div class="chess-board" id="chessBoard"></div>
+            <div id="rightCaptured" style="min-width: 60px;"></div>
+        </div>
+        <div style="display: flex; justify-content: center; align-items: center; gap: 40px; margin-top: 10px;">
+            <div id="whiteMaterial" style="color: #333; font-weight: bold;"></div>
+            <div id="blackMaterial" style="color: #ccc; font-weight: bold;"></div>
+        </div>
         
         <div class="game-controls">
             <button id="resetBtn" class="btn btn-secondary" onclick="resetGame()" disabled>Reset Game</button>
@@ -534,6 +542,86 @@
             window.location.href = '/';
         }
         
+        let timer = 300;
+        let remainingTime = { white: 300, black: 300 };
+        let timerInterval = null;
+        function formatTime(secs) {
+            const m = Math.floor(secs / 60);
+            const s = secs % 60;
+            return `${m}:${s.toString().padStart(2, '0')}`;
+        }
+        function updateTimerDisplay() {
+            document.getElementById('whiteTimer').textContent = formatTime(remainingTime.white);
+            document.getElementById('blackTimer').textContent = formatTime(remainingTime.black);
+        }
+        function startTimerCountdown() {
+            if (timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(() => {
+                if (!gameStarted) return;
+                let turn = currentPlayer;
+                if (remainingTime[turn] > 0 && !gameOver) {
+                    remainingTime[turn]--;
+                    updateTimerDisplay();
+                    if (remainingTime[turn] <= 0) {
+                        remainingTime[turn] = 0;
+                        updateTimerDisplay();
+                        clearInterval(timerInterval);
+                    }
+                }
+            }, 1000);
+        }
+        function stopTimerCountdown() {
+            if (timerInterval) clearInterval(timerInterval);
+        }
+        let gameOver = false;
+
+        let captured = { white: [], black: [] };
+        let materialDiff = 0;
+        function renderCapturedAndMaterial() {
+            // Show captured pieces for each player
+            const leftDiv = document.getElementById('leftCaptured');
+            const rightDiv = document.getElementById('rightCaptured');
+            let whiteHTML = '';
+            let blackHTML = '';
+            // Use pieceSymbols to render
+            captured.white.forEach(pt => {
+                whiteHTML += `<span style='font-size:1.5em;'>${pieceSymbols[pt]['white']}</span> `;
+            });
+            captured.black.forEach(pt => {
+                blackHTML += `<span style='font-size:1.5em;'>${pieceSymbols[pt]['black']}</span> `;
+            });
+            // For white, show their captured pieces on the right, black on the left (from their POV)
+            if (playerColor === 'white') {
+                leftDiv.innerHTML = blackHTML;
+                rightDiv.innerHTML = whiteHTML;
+            } else {
+                leftDiv.innerHTML = whiteHTML;
+                rightDiv.innerHTML = blackHTML;
+            }
+            // Show material diff
+            let whiteMat = '';
+            let blackMat = '';
+            if (materialDiff > 0) {
+                whiteMat = `+${materialDiff}`;
+                blackMat = `${-materialDiff}`;
+            } else if (materialDiff < 0) {
+                whiteMat = `${materialDiff}`;
+                blackMat = `+${-materialDiff}`;
+            } else {
+                whiteMat = blackMat = '';
+            }
+            document.getElementById('whiteMaterial').textContent = `White: ${whiteMat}`;
+            document.getElementById('blackMaterial').textContent = `Black: ${blackMat}`;
+        }
+        function handleGameData(data) {
+            timer = data.timer || 300;
+            remainingTime = data.remaining_time || { white: timer, black: timer };
+            captured = data.captured || { white: [], black: [] };
+            materialDiff = data.material_diff || 0;
+            updateTimerDisplay();
+            renderCapturedAndMaterial();
+        }
+        
         // Socket event handlers
         socket.on('connect', function() {
             console.log('Connected to server');
@@ -563,6 +651,8 @@
         
         socket.on('game_started', function(data) {
             gameStarted = true;
+            gameOver = false;
+            handleGameData(data);
             whiteKing = data.white_king;
             blackKing = data.black_king;
             whiteInCheck = data.white_in_check;
@@ -572,9 +662,11 @@
             updateGameStatus('Game started!', 'playing');
             document.getElementById('readySection').style.display = 'none';
             document.getElementById('resetBtn').disabled = false;
+            startTimerCountdown();
         });
         
         socket.on('move_made', function(data) {
+            handleGameData(data);
             whiteKing = data.white_king;
             blackKing = data.black_king;
             whiteInCheck = data.white_in_check;
@@ -584,6 +676,8 @@
             
             if (data.game_over) {
                 gameStarted = false;
+                gameOver = true;
+                stopTimerCountdown();
                 if (data.winner) {
                     updateGameStatus(`${data.winner.charAt(0).toUpperCase() + data.winner.slice(1)} wins!`, 'game-over');
                     showMessage(`${data.winner === playerColor ? 'You' : 'Opponent'} won!`, 
@@ -595,6 +689,7 @@
             }
             
             deselectSquare();
+            startTimerCountdown();
         });
         
         socket.on('valid_moves', function(data) {
@@ -608,6 +703,8 @@
         
         socket.on('game_reset', function(data) {
             gameStarted = false;
+            gameOver = false;
+            handleGameData(data);
             whiteKing = data.white_king;
             blackKing = data.black_king;
             whiteInCheck = data.white_in_check;
@@ -620,6 +717,8 @@
             document.getElementById('readyBtn').textContent = 'Ready to Play';
             document.getElementById('resetBtn').disabled = true;
             deselectSquare();
+            stopTimerCountdown();
+            updateTimerDisplay();
         });
         
         socket.on('player_disconnected', function(data) {
@@ -652,6 +751,7 @@
         
         // New handler for state sync
         socket.on('game_state', function(data) {
+            handleGameData(data);
             whiteKing = data.white_king;
             blackKing = data.black_king;
             whiteInCheck = data.white_in_check;
@@ -666,9 +766,12 @@
                 document.getElementById('readySection').style.display = 'none';
                 document.getElementById('resetBtn').disabled = false;
                 updateGameStatus(`${currentPlayer.charAt(0).toUpperCase() + currentPlayer.slice(1)}'s Turn`, 'playing');
+                startTimerCountdown();
             } else {
                 document.getElementById('readySection').style.display = 'block';
                 updateGameStatus('Waiting for players to ready up...', 'waiting');
+                stopTimerCountdown();
+                updateTimerDisplay();
             }
         });
         

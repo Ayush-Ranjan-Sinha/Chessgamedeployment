@@ -37,7 +37,13 @@ def game(game_code):
 
 
 @socketio.on('create_game')
-def handle_create_game():
+def handle_create_game(data=None):
+    timer = 300  # default 5 min
+    if data and 'timer' in data:
+        try:
+            timer = int(data['timer'])
+        except Exception:
+            timer = 300
     game_code = generate_game_code()
     while game_code in games:
         game_code = generate_game_code()
@@ -49,7 +55,13 @@ def handle_create_game():
         'game_started': False,
         'game_over': False,
         'winner': None,
-        'last_activity': time.time()
+        'last_activity': time.time(),
+        'timer': timer,
+        'remaining_time': {
+            'white': timer,
+            'black': timer
+        },
+        'last_move_time': None
     }
     
     player_id = str(uuid.uuid4())
@@ -68,7 +80,7 @@ def handle_create_game():
     
     join_room(game_code)
     
-    print(f"DEBUG: Game created with code: {game_code}")
+    print(f"DEBUG: Game created with code: {game_code}, timer: {timer}")
     
     emit('game_created', {
         'game_code': game_code,
@@ -188,7 +200,11 @@ def handle_get_game_state(data):
         'player_color': color,
         'game_started': game['game_started'],
         'current_player': game['current_player'],
-        'players': player_status
+        'players': player_status,
+        'timer': game['timer'],
+        'remaining_time': game['remaining_time'],
+        'captured': board_state['captured'],
+        'material_diff': board_state['material_diff']
     })
     print(f"DEBUG: Sent game state to player {player_id} in {game_code}")
 
@@ -219,6 +235,7 @@ def handle_player_ready(data):
     all_ready = all(p['ready'] for p in game['players'].values()) and len(game['players']) == 2
     if all_ready:
         game['game_started'] = True
+        game['last_move_time'] = time.time()
         board_state = game['board'].get_board_state()
         socketio.emit('game_started', {
             'board_state': board_state['board'],
@@ -226,7 +243,11 @@ def handle_player_ready(data):
             'black_king': board_state['black_king'],
             'white_in_check': board_state['white_in_check'],
             'black_in_check': board_state['black_in_check'],
-            'current_player': game['current_player']
+            'current_player': game['current_player'],
+            'timer': game['timer'],
+            'remaining_time': game['remaining_time'],
+            'captured': board_state['captured'],
+            'material_diff': board_state['material_diff']
         }, room=game_code)
         print(f"DEBUG: Game {game_code} started - both players ready")
     else:
@@ -257,6 +278,33 @@ def handle_make_move(data):
     
     from_pos = data['from']
     to_pos = data['to']
+    # Timer logic
+    now = time.time()
+    if game['last_move_time']:
+        elapsed = now - game['last_move_time']
+        color = player_color
+        game['remaining_time'][color] -= int(elapsed)
+        if game['remaining_time'][color] <= 0:
+            game['remaining_time'][color] = 0
+            game['game_over'] = True
+            game['winner'] = 'black' if color == 'white' else 'white'
+            board_state = game['board'].get_board_state()
+            socketio.emit('move_made', {
+                'board_state': board_state['board'],
+                'white_king': board_state['white_king'],
+                'black_king': board_state['black_king'],
+                'white_in_check': board_state['white_in_check'],
+                'black_in_check': board_state['black_in_check'],
+                'current_player': game['current_player'],
+                'game_over': game['game_over'],
+                'winner': game['winner'],
+                'timer': game['timer'],
+                'remaining_time': game['remaining_time'],
+                'captured': board_state['captured'],
+                'material_diff': board_state['material_diff']
+            }, room=game_code)
+            return
+    game['last_move_time'] = now
     # Removed promotion from call - your class handles it internally
     print(f"DEBUG: Attempting move from {from_pos} to {to_pos} by {player_color}")
     success = game['board'].make_move(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
@@ -283,7 +331,11 @@ def handle_make_move(data):
             'black_in_check': board_state['black_in_check'],
             'current_player': game['current_player'],
             'game_over': game['game_over'],
-            'winner': game['winner']
+            'winner': game['winner'],
+            'timer': game['timer'],
+            'remaining_time': game['remaining_time'],
+            'captured': board_state['captured'],
+            'material_diff': board_state['material_diff']
         }, room=game_code)
         print(f"DEBUG: Broadcasted move_made to {game_code}")
     else:
@@ -333,6 +385,8 @@ def handle_reset_game():
     game['current_player'] = 'white'
     game['game_over'] = False
     game['winner'] = None
+    game['remaining_time'] = {'white': game['timer'], 'black': game['timer']}
+    game['last_move_time'] = None
     
     for player in game['players'].values():
         player['ready'] = False
@@ -344,7 +398,11 @@ def handle_reset_game():
         'black_king': board_state['black_king'],
         'white_in_check': board_state['white_in_check'],
         'black_in_check': board_state['black_in_check'],
-        'current_player': game['current_player']
+        'current_player': game['current_player'],
+        'timer': game['timer'],
+        'remaining_time': game['remaining_time'],
+        'captured': board_state['captured'],
+        'material_diff': board_state['material_diff']
     }, room=game_code)
 
 

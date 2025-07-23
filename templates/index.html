@@ -191,6 +191,12 @@
         <h1>Online Chess</h1>
         
         <div id="main-menu" class="game-options">
+            <label for="timerSelect" style="font-weight:bold;">Timer:</label>
+            <select id="timerSelect" style="padding:10px; border-radius:8px; font-size:1em;">
+                <option value="60">1 Minute</option>
+                <option value="300" selected>5 Minutes</option>
+                <option value="600">10 Minutes</option>
+            </select>
             <button class="create-btn" onclick="createGame()">Create New Game</button>
             
             <div class="join-section">
@@ -247,7 +253,8 @@
         
         function createGame() {
             showMessage('Creating game...', 'success');
-            socket.emit('create_game');
+            const timer = document.getElementById('timerSelect').value;
+            socket.emit('create_game', { timer: parseInt(timer) });
         }
         
         function joinGame() {
