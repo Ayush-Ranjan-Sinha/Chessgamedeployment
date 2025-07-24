@@ -27,11 +27,11 @@ def index():
 @app.route('/game/<game_code>')
 def game(game_code):
     game_code = game_code.upper()
-    print(f"DEBUG: Accessing game page for code: {game_code}")
-    print(f"DEBUG: Active games: {list(games.keys())}")
+    # print(f"DEBUG: Accessing game page for code: {game_code}")
+    # print(f"DEBUG: Active games: {list(games.keys())}")
     
     if game_code not in games:
-        print(f"DEBUG: Game {game_code} not found, redirecting to home")
+        # print(f"DEBUG: Game {game_code} not found, redirecting to home")
         return redirect(url_for('index'))
     
     return render_template('game.html', game_code=game_code)
@@ -81,7 +81,7 @@ def handle_create_game(data=None):
     
     join_room(game_code)
     
-    print(f"DEBUG: Game created with code: {game_code}, timer: {timer}")
+    # print(f"DEBUG: Game created with code: {game_code}, timer: {timer}")
     
     emit('game_created', {
         'game_code': game_code,
@@ -110,7 +110,7 @@ def handle_join_game(data):
             'player_id': player_id,
             'color': color
         }
-        print(f"DEBUG: Player {player_id} rejoined as {color}")
+        # print(f"DEBUG: Player {player_id} rejoined as {color}")
     else:
         if len(game['players']) >= 2:
             emit('error', {'message': 'Game is full'})
@@ -130,7 +130,7 @@ def handle_join_game(data):
             'player_id': player_id,
             'color': color
         }
-        print(f"DEBUG: New player {player_id} joined as {color}")
+        # print(f"DEBUG: New player {player_id} joined as {color}")
     
     join_room(game_code)
     game['last_activity'] = time.time()
@@ -159,19 +159,19 @@ def handle_get_game_state(data):
     player_id = data.get('player_id')
     
     if not player_id:
-        print(f"DEBUG: get_game_state failed - Player ID required")
+        # print(f"DEBUG: get_game_state failed - Player ID required")
         emit('error', {'message': 'Player ID required'})
         return
     
     if game_code not in games:
-        print(f"DEBUG: get_game_state failed - Game {game_code} not found")
+        # print(f"DEBUG: get_game_state failed - Game {game_code} not found")
         emit('error', {'message': 'Game not found'})
         return
     
     game = games[game_code]
     
     if player_id not in game['players']:
-        print(f"DEBUG: get_game_state failed - Not authorized for player {player_id} in {game_code}")
+        # print(f"DEBUG: get_game_state failed - Not authorized for player {player_id} in {game_code}")
         emit('error', {'message': 'Not authorized for this game'})
         return
     
@@ -207,12 +207,12 @@ def handle_get_game_state(data):
         'captured': board_state['captured'],
         'material_diff': board_state['material_diff']
     })
-    print(f"DEBUG: Sent game state to player {player_id} in {game_code}")
+    # print(f"DEBUG: Sent game state to player {player_id} in {game_code}")
 
 
 @socketio.on('player_ready')
 def handle_player_ready(data):
-    print(f"DEBUG: Received player_ready from sid: {request.sid}")
+    # print(f"DEBUG: Received player_ready from sid: {request.sid}")
     if request.sid not in players:
         print(f"DEBUG: player_ready failed - SID not in players")
         return
@@ -222,16 +222,16 @@ def handle_player_ready(data):
     player_id = player_info['player_id']
     
     if game_code not in games:
-        print(f"DEBUG: player_ready failed - Game {game_code} not found")
+        # print(f"DEBUG: player_ready failed - Game {game_code} not found")
         return
     
     game = games[game_code]
     if player_id in game['players']:
         game['players'][player_id]['ready'] = True
-        print(f"DEBUG: Player {player_id} marked as ready in {game_code}")
+        # print(f"DEBUG: Player {player_id} marked as ready in {game_code}")
     
     ready_status = {pid: p['ready'] for pid, p in game['players'].items()}
-    print(f"DEBUG: Current ready statuses in {game_code}: {ready_status}")
+    # print(f"DEBUG: Current ready statuses in {game_code}: {ready_status}")
     
     all_ready = all(p['ready'] for p in game['players'].values()) and len(game['players']) == 2
     if all_ready:
@@ -250,17 +250,17 @@ def handle_player_ready(data):
             'captured': board_state['captured'],
             'material_diff': board_state['material_diff']
         }, room=game_code)
-        print(f"DEBUG: Game {game_code} started - both players ready")
+        # print(f"DEBUG: Game {game_code} started - both players ready")
     else:
-        print(f"DEBUG: Not all ready yet in {game_code} - waiting for other player")
+        # print(f"DEBUG: Not all ready yet in {game_code} - waiting for other player")
         socketio.emit('message', {'message': 'Waiting for other player to ready up', 'type': 'info'}, room=game_code)
 
 
 @socketio.on('make_move')
 def handle_make_move(data):
-    print(f"DEBUG: Received make_move from sid: {request.sid} - data: {data}")
+    # print(f"DEBUG: Received make_move from sid: {request.sid} - data: {data}")
     if request.sid not in players:
-        print("DEBUG: make_move failed - SID not in players")
+        # print("DEBUG: make_move failed - SID not in players")
         return
     
     player_info = players[request.sid]
@@ -268,12 +268,12 @@ def handle_make_move(data):
     player_color = player_info['color']
     
     if game_code not in games:
-        print(f"DEBUG: make_move failed - Game {game_code} not found")
+        # print(f"DEBUG: make_move failed - Game {game_code} not found")
         return
     
     game = games[game_code]
     if game['current_player'] != player_color or game['game_over']:
-        print(f"DEBUG: Invalid move - not {player_color}'s turn or game over")
+        # print(f"DEBUG: Invalid move - not {player_color}'s turn or game over")
         emit('invalid_move', {'message': 'Not your turn or game over'})
         return
     
@@ -307,21 +307,21 @@ def handle_make_move(data):
             return
     game['last_move_time'] = now
     # Removed promotion from call - your class handles it internally
-    print(f"DEBUG: Attempting move from {from_pos} to {to_pos} by {player_color}")
+    # print(f"DEBUG: Attempting move from {from_pos} to {to_pos} by {player_color}")
     success = game['board'].make_move(from_pos[0], from_pos[1], to_pos[0], to_pos[1])
     
     if success:
-        print(f"DEBUG: Move successful in {game_code}")
+        # print(f"DEBUG: Move successful in {game_code}")
         game['current_player'] = 'black' if game['current_player'] == 'white' else 'white'
         
         if game['board'].is_checkmate(game['current_player']):
             game['game_over'] = True
             game['winner'] = player_color
-            print(f"DEBUG: Checkmate - {player_color} wins in {game_code}")
+            # print(f"DEBUG: Checkmate - {player_color} wins in {game_code}")
         elif game['board'].is_stalemate(game['current_player']):
             game['game_over'] = True
             game['winner'] = None
-            print(f"DEBUG: Stalemate in {game_code}")
+            # print(f"DEBUG: Stalemate in {game_code}")
         
         board_state = game['board'].get_board_state()
         socketio.emit('move_made', {
@@ -338,31 +338,31 @@ def handle_make_move(data):
             'captured': board_state['captured'],
             'material_diff': board_state['material_diff']
         }, room=game_code)
-        print(f"DEBUG: Broadcasted move_made to {game_code}")
+        # print(f"DEBUG: Broadcasted move_made to {game_code}")
     else:
-        print(f"DEBUG: Move failed in {game_code} - invalid move (check validation or path blocked?)")
+        # print(f"DEBUG: Move failed in {game_code} - invalid move (check validation or path blocked?)")
         emit('invalid_move', {'message': 'Invalid move'})
 
 
 @socketio.on('get_valid_moves')
 def handle_get_valid_moves(data):
-    print(f"DEBUG: Received get_valid_moves from sid: {request.sid} - position: {data['position']}")
+    # print(f"DEBUG: Received get_valid_moves from sid: {request.sid} - position: {data['position']}")
     if request.sid not in players:
-        print("DEBUG: get_valid_moves failed - SID not in players")
+        # print("DEBUG: get_valid_moves failed - SID not in players")
         return
     
     player_info = players[request.sid]
     game_code = player_info['game_code']
     
     if game_code not in games:
-        print(f"DEBUG: get_valid_moves failed - Game {game_code} not found")
+        # print(f"DEBUG: get_valid_moves failed - Game {game_code} not found")
         return
     
     game = games[game_code]
     pos = data['position']
     
     valid_moves = game['board'].get_valid_moves(pos[0], pos[1])
-    print(f"DEBUG: Valid moves for {pos} in {game_code}: {valid_moves}")
+    # print(f"DEBUG: Valid moves for {pos} in {game_code}: {valid_moves}")
     
     emit('valid_moves', {
         'position': pos,
@@ -409,7 +409,7 @@ def handle_reset_game():
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    print(f"DEBUG: Player disconnected with sid: {request.sid}")
+    # print(f"DEBUG: Player disconnected with sid: {request.sid}")
     if request.sid in players:
         player_info = players[request.sid]
         game_code = player_info['game_code']
@@ -430,7 +430,7 @@ def handle_disconnect():
         def cleanup_game():
             if game_code in games and all(p['sid'] is None for p in games[game_code]['players'].values()) and time.time() - games[game_code]['last_activity'] > 300:
                 del games[game_code]
-                print(f"DEBUG: Cleaned up inactive game {game_code}")
+                # print(f"DEBUG: Cleaned up inactive game {game_code}")
         
         socketio.start_background_task(cleanup_game)
 

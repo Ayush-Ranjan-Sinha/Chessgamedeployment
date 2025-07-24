@@ -313,14 +313,22 @@
         });
         
         socket.on('player_joined', function(data) {
-            if (data.can_start) {
-                showMessage('Opponent joined! Starting game...', 'success');
-                setTimeout(() => {
-                    const gameCode = document.getElementById('gameCode').textContent;
-                    window.location.href = `/game/${gameCode}`;
-                }, 1000);
-            }
-        });
+    if (data.can_start) {
+        showMessage('Opponent joined! Starting game...', 'success');
+        const gameCode = document.getElementById('gameCode')?.textContent?.trim();
+        console.log("Redirecting to /game/", gameCode); // Debug
+
+        if (!gameCode) {
+            console.error("No game code found in DOM!");
+            return;
+        }
+
+        setTimeout(() => {
+            window.location.href = `/game/${gameCode}`;
+        }, 1000);
+    }
+});
+
         
         socket.on('error', function(data) {
             showMessage(data.message, 'error');
