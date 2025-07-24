@@ -1,1 +1,1 @@
-#GridWars : The Python Chess Game
+# GridWars : The Python Chess Game
