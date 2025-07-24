@@ -107,7 +107,6 @@
             margin: 20px auto;
             border: 3px solid #444;
             border-radius: 8px;
-            overflow: hidden;
             background: #181a1b;
         }
         
@@ -319,6 +318,11 @@
             border-radius: 6px;
             background: #232526;
             border: 1px solid #444;
+        }
+        @media (max-width: 378px) {
+            .chess-board{
+                overflow: scroll;
+            }
         }
     </style>
 </head>
