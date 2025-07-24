@@ -8,7 +8,6 @@ import time
 import threading
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
 games = {}
@@ -214,7 +213,7 @@ def handle_get_game_state(data):
 def handle_player_ready(data):
     # print(f"DEBUG: Received player_ready from sid: {request.sid}")
     if request.sid not in players:
-        print(f"DEBUG: player_ready failed - SID not in players")
+        # print(f"DEBUG: player_ready failed - SID not in players")
         return
     
     player_info = players[request.sid]
@@ -475,4 +474,4 @@ threading.Thread(target=timer_check_task, daemon=True).start()
 
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)
+    socketio.run(app, host='0.0.0.0', port=5000, use_reloader=False)
